@@ -1,3 +1,4 @@
+import sys
 import copy
 import mock
 import unittest
@@ -804,8 +805,34 @@ class RollbarTest(BaseTest):
 
         frames = payload['data']['body']['trace']['frames']
         called_with_frame = frames[1]
-        
+
         self.assertEqual('changed', called_with_frame['args'][0])
+
+    @mock.patch('rollbar.send_payload')
+    def test_unicode_exc_info(self, send_payload):
+        major_version = sys.version_info[0]
+        if major_version < 3:
+            try:
+                message = u'\u221a'
+                expected = '\xe2\x88\x9a'
+            except:
+                message = '\u221a'
+                expected = '\u221a'
+        else:
+            message = '\u221a'
+            expected = '\u221a'
+
+        def _raise():
+            raise Exception(message)
+
+        try:
+            _raise()
+        except:
+            rollbar.report_exc_info()
+
+        self.assertEqual(send_payload.called, True)
+        payload = send_payload.call_args[0][0]
+        self.assertEqual(payload['data']['body']['trace']['exception']['message'], expected)
 
 
 
